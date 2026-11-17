@@ -1,6 +1,11 @@
 // Caches the app shell so it keeps working with no internet connection.
 // All real data (posts, photos) lives in IndexedDB, not in this cache.
-const CACHE_NAME = "feedless-v1";
+//
+// Strategy: network-first. Whenever you're online, you always get the
+// latest deployed files (and the cache quietly refreshes behind you).
+// Only when a fetch actually fails (no connection) do we fall back to
+// whatever was last cached, so offline use still works.
+const CACHE_NAME = "feedless-v2";
 const ASSETS = [
   "./",
   "./index.html",
@@ -30,15 +35,12 @@ self.addEventListener("activate", (event) => {
 self.addEventListener("fetch", (event) => {
   if (event.request.method !== "GET") return;
   event.respondWith(
-    caches.match(event.request).then((cached) => {
-      if (cached) return cached;
-      return fetch(event.request)
-        .then((res) => {
-          const copy = res.clone();
-          caches.open(CACHE_NAME).then((cache) => cache.put(event.request, copy)).catch(() => {});
-          return res;
-        })
-        .catch(() => caches.match("./index.html"));
-    })
+    fetch(event.request)
+      .then((res) => {
+        const copy = res.clone();
+        caches.open(CACHE_NAME).then((cache) => cache.put(event.request, copy)).catch(() => {});
+        return res;
+      })
+      .catch(() => caches.match(event.request).then((cached) => cached || caches.match("./index.html")))
   );
 });
