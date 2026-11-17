@@ -1,0 +1,18 @@
+{
+  "version": "0.0.1",
+  "configurations": [
+    {
+      "name": "feedless",
+      "runtimeExecutable": "python3",
+      "runtimeArgs": [
+        "-I",
+        "-m",
+        "http.server",
+        "8767",
+        "--bind",
+        "127.0.0.1"
+      ],
+      "port": 8767
+    }
+  ]
+}

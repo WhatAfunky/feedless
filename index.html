@@ -1,0 +1,193 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover, maximum-scale=1" />
+<title>Feedless</title>
+<meta name="description" content="A private, offline practice feed for stories and posts. Nothing ever leaves your phone." />
+<meta name="theme-color" content="#14161c" />
+<link rel="manifest" href="manifest.json" />
+<link rel="apple-touch-icon" href="icons/apple-touch-icon.png" />
+<meta name="apple-mobile-web-app-capable" content="yes" />
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
+<meta name="apple-mobile-web-app-title" content="Feedless" />
+<link rel="stylesheet" href="style.css" />
+</head>
+<body>
+
+<div id="app">
+
+  <!-- ===== Top bar ===== -->
+  <header class="topbar">
+    <button id="profileBtn" class="avatar-btn" aria-label="Profile">
+      <img id="profileAvatar" src="" alt="" />
+    </button>
+    <div class="topbar-title" id="topbarTitle">Stories</div>
+    <button id="settingsBtn" class="icon-btn" aria-label="Settings">⚙</button>
+  </header>
+
+  <!-- ===== STORIES VIEW ===== -->
+  <section id="storiesView" class="view">
+    <div class="ring-row" id="ringRow">
+      <button class="ring-item add-ring" id="addStoryBtn">
+        <span class="ring-thumb add-thumb">+</span>
+        <span class="ring-label">Add</span>
+      </button>
+      <!-- story ring items injected here -->
+    </div>
+
+    <div class="archive-toggle-row">
+      <button id="archiveToggleBtn" class="link-btn">View archive ▾</button>
+    </div>
+
+    <div id="storyArchiveGrid" class="archive-grid hidden"></div>
+
+    <div id="storiesEmpty" class="empty-state hidden">
+      <p>No stories yet.</p>
+      <p class="muted">Tap “Add” to post your first one.</p>
+    </div>
+  </section>
+
+  <!-- ===== TWEETS VIEW ===== -->
+  <section id="tweetsView" class="view hidden">
+    <div class="composer">
+      <img class="composer-avatar" id="composerAvatar" src="" alt="" />
+      <div class="composer-body">
+        <textarea id="tweetText" maxlength="280" placeholder="What's happening?"></textarea>
+        <div id="tweetImagePreviewWrap" class="tweet-image-preview-wrap hidden">
+          <img id="tweetImagePreview" src="" alt="" />
+          <button id="removeTweetImage" class="chip-x">✕</button>
+        </div>
+        <div class="composer-row">
+          <button id="tweetImageBtn" class="icon-btn small" aria-label="Add photo">🖼</button>
+          <input id="tweetImageInput" type="file" accept="image/*" class="hidden-input" />
+          <span id="tweetCount" class="char-count">280</span>
+          <button id="tweetPostBtn" class="post-btn" disabled>Post</button>
+        </div>
+      </div>
+    </div>
+
+    <div id="tweetTimeline" class="timeline"></div>
+
+    <div id="tweetsEmpty" class="empty-state hidden">
+      <p>No posts yet.</p>
+      <p class="muted">Say something above.</p>
+    </div>
+  </section>
+
+  <!-- ===== Bottom tab bar ===== -->
+  <nav class="tabbar">
+    <button class="tab-btn active" data-tab="stories">
+      <span class="tab-icon">◎</span><span>Stories</span>
+    </button>
+    <button class="tab-btn" data-tab="tweets">
+      <span class="tab-icon">✎</span><span>Posts</span>
+    </button>
+  </nav>
+
+  <!-- ===== Story viewer (fullscreen) ===== -->
+  <div id="storyViewer" class="story-viewer hidden">
+    <div class="story-progress-row" id="storyProgressRow"></div>
+    <div class="story-viewer-header">
+      <img id="storyViewerAvatar" src="" alt="" />
+      <div class="story-viewer-meta">
+        <div id="storyViewerName"></div>
+        <div id="storyViewerTime" class="muted small"></div>
+      </div>
+      <button id="storyViewerDelete" class="icon-btn" aria-label="Delete story">🗑</button>
+      <button id="storyViewerClose" class="icon-btn" aria-label="Close">✕</button>
+    </div>
+    <div class="story-stage" id="storyStage">
+      <div class="story-tap-zone left" id="storyPrev"></div>
+      <div class="story-tap-zone right" id="storyNext"></div>
+      <div id="storyStageContent" class="story-stage-content"></div>
+    </div>
+  </div>
+
+  <!-- ===== Story composer (fullscreen) ===== -->
+  <div id="storyComposer" class="story-composer hidden">
+    <div class="composer-topbar">
+      <button id="storyComposerClose" class="icon-btn">✕</button>
+      <div class="composer-topbar-actions">
+        <button id="storyZoomOut" class="chip-btn icon-only hidden" aria-label="Zoom out">−</button>
+        <button id="storyZoomIn" class="chip-btn icon-only hidden" aria-label="Zoom in">+</button>
+        <button id="storyPickPhoto" class="chip-btn">Photo</button>
+        <input id="storyPhotoInput" type="file" accept="image/*" class="hidden-input" />
+        <button id="storyColorBtn" class="chip-btn">Background</button>
+        <button id="storyAddTextBtn" class="chip-btn">Aa Text</button>
+      </div>
+    </div>
+    <div class="story-canvas-wrap">
+      <div id="storyCanvas" class="story-canvas"></div>
+    </div>
+    <div id="colorSwatchRow" class="color-swatch-row hidden"></div>
+    <div class="story-bottom-row">
+      <button id="storyShareBtn" class="post-btn wide">Share to story</button>
+    </div>
+  </div>
+
+  <!-- ===== Settings sheet ===== -->
+  <div id="settingsSheet" class="sheet hidden">
+    <div class="sheet-backdrop" id="settingsBackdrop"></div>
+    <div class="sheet-content">
+      <div class="sheet-handle"></div>
+      <h2>Profile &amp; settings</h2>
+
+      <div class="form-row avatar-row">
+        <img id="settingsAvatarPreview" src="" alt="" />
+        <button id="changeAvatarBtn" class="chip-btn">Change photo</button>
+        <input id="avatarInput" type="file" accept="image/*" class="hidden-input" />
+      </div>
+
+      <label class="form-label">Display name
+        <input id="nameInput" type="text" maxlength="40" placeholder="Your name" />
+      </label>
+      <label class="form-label">Handle
+        <input id="handleInput" type="text" maxlength="20" placeholder="yourhandle" />
+      </label>
+
+      <label class="form-label toggle-row">
+        <span>Fake likes &amp; replies grow over time</span>
+        <input id="fakeEngagementToggle" type="checkbox" />
+      </label>
+
+      <div class="sheet-divider"></div>
+
+      <div class="sheet-row-buttons">
+        <button id="exportBtn" class="chip-btn">Export backup</button>
+        <button id="importBtn" class="chip-btn">Import backup</button>
+        <input id="importInput" type="file" accept="application/json" class="hidden-input" />
+      </div>
+
+      <button id="deleteAllBtn" class="danger-btn">Delete everything</button>
+
+      <div class="offline-status" id="offlineStatus"></div>
+
+      <button id="settingsDoneBtn" class="post-btn wide">Done</button>
+    </div>
+  </div>
+
+  <!-- ===== Generic confirm dialog ===== -->
+  <div id="confirmDialog" class="confirm-dialog hidden">
+    <div class="confirm-box">
+      <p id="confirmMessage"></p>
+      <div class="confirm-actions">
+        <button id="confirmCancel" class="chip-btn">Cancel</button>
+        <button id="confirmOk" class="danger-btn">Delete</button>
+      </div>
+    </div>
+  </div>
+
+  <div id="toast" class="toast hidden"></div>
+
+  <!-- ===== Fullsize image lightbox ===== -->
+  <div id="imageLightbox" class="image-lightbox hidden">
+    <img id="imageLightboxImg" src="" alt="" />
+  </div>
+
+</div>
+
+<script src="db.js"></script>
+<script src="app.js"></script>
+</body>
+</html>
