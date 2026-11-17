@@ -1,7 +1,7 @@
 // Tiny promise-based IndexedDB wrapper. Everything stays on this device.
 const DB = (() => {
   const DB_NAME = "feedless-db";
-  const DB_VERSION = 1;
+  const DB_VERSION = 2;
   let dbPromise = null;
 
   function open() {
@@ -20,6 +20,10 @@ const DB = (() => {
         if (!db.objectStoreNames.contains("tweets")) {
           const t = db.createObjectStore("tweets", { keyPath: "id" });
           t.createIndex("createdAt", "createdAt");
+        }
+        if (!db.objectStoreNames.contains("feedPosts")) {
+          const f = db.createObjectStore("feedPosts", { keyPath: "id" });
+          f.createIndex("createdAt", "createdAt");
         }
       };
       req.onsuccess = () => resolve(req.result);
@@ -78,7 +82,7 @@ const DB = (() => {
   }
 
   async function clearAll() {
-    const names = ["kv", "stories", "tweets"];
+    const names = ["kv", "stories", "tweets", "feedPosts"];
     for (const name of names) {
       const store = await tx(name, "readwrite");
       await new Promise((resolve, reject) => {

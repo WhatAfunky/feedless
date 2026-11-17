@@ -18,6 +18,10 @@ body.mode-tweets { --accent: #1d9bf0; }
 
 * { box-sizing: border-box; -webkit-tap-highlight-color: transparent; }
 
+@media (prefers-reduced-motion: reduce) {
+  *, *::before, *::after { animation-duration: .001ms !important; transition-duration: .001ms !important; }
+}
+
 html, body {
   margin: 0;
   height: 100%;
@@ -38,6 +42,44 @@ html, body {
 .hidden { display: none !important; }
 .muted { color: var(--text-muted); }
 .small { font-size: 12px; }
+
+/* ===== Posting progress bar ===== */
+.post-progress-bar {
+  position: fixed;
+  top: var(--safe-top);
+  left: 0;
+  height: 2.5px;
+  width: 0%;
+  background: var(--accent);
+  box-shadow: 0 0 8px var(--accent);
+  border-radius: 0 2px 2px 0;
+  z-index: 300;
+  opacity: 0;
+  pointer-events: none;
+}
+
+/* ===== Snappy tap feedback ===== */
+.chip-btn, .post-btn, .tab-btn, .ring-item, .icon-btn, .link-btn,
+.swatch, .archive-cell, .ig-sub-btn, .feed-compose-row, .feed-actions-row span {
+  transition: transform .08s ease;
+}
+.chip-btn:active, .post-btn:active:not(:disabled), .tab-btn:active,
+.ring-item:active, .icon-btn:active, .link-btn:active, .swatch:active,
+.archive-cell:active, .ig-sub-btn:active, .feed-compose-row:active,
+.feed-actions-row span:active {
+  transform: scale(.92);
+}
+
+/* ===== View / entrance animations ===== */
+@keyframes viewPopIn { from { opacity: 0; transform: translateY(6px); } to { opacity: 1; transform: translateY(0); } }
+.view.anim-in, .ig-pane.anim-in { animation: viewPopIn .18s ease; }
+
+@keyframes popIn { from { opacity: 0; transform: scale(.96) translateY(4px); } to { opacity: 1; transform: scale(1) translateY(0); } }
+.pop-in { animation: popIn .25s cubic-bezier(.2,.8,.2,1); }
+
+@keyframes fadeIn { from { opacity: 0; } to { opacity: 1; } }
+@keyframes scaleIn { from { opacity: 0; transform: scale(.92); } to { opacity: 1; transform: scale(1); } }
+@keyframes sheetUp { from { opacity: 0; transform: translateY(30px); } to { opacity: 1; transform: translateY(0); } }
 
 /* ===== Topbar ===== */
 .topbar {
@@ -115,6 +157,73 @@ html, body {
 }
 .ring-label { font-size: 11px; color: var(--text-muted); max-width: 64px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .add-thumb { border: 2px dashed var(--border); background: var(--bg-elevated); font-size: 26px; color: var(--accent); }
+
+/* ===== Instagram sub-nav (Stories / Feed) ===== */
+.ig-subnav { display: flex; gap: 8px; padding: 10px 14px 2px; }
+.ig-sub-btn {
+  flex: 1;
+  background: var(--bg-elevated);
+  border: none;
+  color: var(--text-muted);
+  padding: 8px;
+  border-radius: 20px;
+  font-weight: 700;
+  font-size: 13px;
+}
+.ig-sub-btn.active { background: var(--accent); color: #fff; }
+
+/* ===== Instagram feed (posts) ===== */
+.feed-compose-row {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  width: 100%;
+  background: none;
+  border: none;
+  border-bottom: 1px solid var(--border);
+  padding: 12px 14px;
+  text-align: left;
+  color: var(--text);
+}
+.feed-compose-avatar { width: 40px; height: 40px; border-radius: 50%; object-fit: cover; flex: 0 0 auto; background: var(--bg-elevated-2); }
+.feed-compose-placeholder { flex: 1; color: var(--text-muted); font-size: 15px; }
+.feed-compose-plus { font-size: 22px; color: var(--accent); font-weight: 700; }
+
+.feed-list { display: flex; flex-direction: column; }
+.feed-card { border-bottom: 1px solid var(--border); padding-bottom: 8px; }
+.feed-card-head { display: flex; align-items: center; gap: 10px; padding: 10px 14px; }
+.feed-card-avatar { width: 34px; height: 34px; border-radius: 50%; object-fit: cover; background: var(--bg-elevated-2); flex: 0 0 auto; }
+.feed-card-name { font-weight: 700; font-size: 14px; flex: 1; }
+.feed-card-menu { background: none; border: none; color: var(--text); font-size: 16px; }
+.feed-image-wrap { aspect-ratio: 1/1; background: var(--bg-elevated-2); overflow: hidden; cursor: zoom-in; }
+.feed-image-wrap img { width: 100%; height: 100%; object-fit: cover; display: block; }
+.feed-actions-row { display: flex; align-items: center; gap: 16px; padding: 10px 14px 2px; color: var(--text); }
+.feed-actions-row svg { width: 24px; height: 24px; display: block; }
+.feed-actions-row span { display: flex; }
+.feed-actions-row .spacer { flex: 1; }
+.feed-likes { font-weight: 700; font-size: 14px; padding: 4px 14px 2px; }
+.feed-caption { font-size: 14px; padding: 2px 14px 2px; line-height: 1.4; }
+.feed-caption .fc-username { font-weight: 700; margin-right: 6px; }
+.feed-caption .hashtag { color: var(--accent); }
+.feed-comments-link { font-size: 13px; color: var(--text-muted); padding: 3px 14px 2px; }
+.feed-time { font-size: 11px; color: var(--text-muted); text-transform: uppercase; letter-spacing: .03em; padding: 4px 14px 0; }
+
+/* ===== Feed post composer ===== */
+.feed-compose-preview-wrap { flex: 1; display: flex; align-items: center; justify-content: center; padding: 16px; overflow: hidden; }
+.feed-compose-preview {
+  width: 100%; max-width: 420px; aspect-ratio: 1/1;
+  background: #1c1c22; border-radius: 14px; overflow: hidden;
+  display: flex; align-items: center; justify-content: center; position: relative;
+}
+.feed-compose-preview img { width: 100%; height: 100%; object-fit: cover; display: block; }
+.feed-compose-hint { color: rgba(255,255,255,.5); font-size: 14px; }
+.feed-caption-row { padding: 0 14px 10px; }
+.feed-caption-row textarea {
+  width: 100%; min-height: 70px;
+  background: rgba(255,255,255,.06); border: 1px solid rgba(255,255,255,.12);
+  border-radius: 12px; color: #fff; padding: 10px 12px; font-size: 14px;
+  font-family: inherit; resize: none;
+}
 
 .archive-toggle-row { padding: 0 14px 6px; }
 .link-btn { background: none; border: none; color: var(--accent); font-size: 14px; padding: 6px 0; }
@@ -231,6 +340,7 @@ html, body {
   display: flex; flex-direction: column;
   padding-top: var(--safe-top);
 }
+.story-viewer:not(.hidden) { animation: fadeIn .12s ease; }
 .story-progress-row { display: flex; gap: 4px; padding: 8px 10px 0; }
 .story-progress-row .seg { flex: 1; height: 2.5px; background: rgba(255,255,255,.3); border-radius: 2px; overflow: hidden; }
 .story-progress-row .seg .fill { height: 100%; width: 0%; background: #fff; }
@@ -270,6 +380,7 @@ html, body {
   display: flex; flex-direction: column;
   padding-top: var(--safe-top); padding-bottom: var(--safe-bottom);
 }
+.story-composer:not(.hidden) { animation: fadeIn .12s ease; }
 .composer-topbar {
   display: flex; align-items: center; justify-content: space-between;
   padding: 10px 12px; gap: 8px;
@@ -327,6 +438,8 @@ html, body {
 
 /* ===== Settings sheet ===== */
 .sheet { position: fixed; inset: 0; z-index: 70; display: flex; align-items: flex-end; }
+.sheet:not(.hidden) .sheet-backdrop { animation: fadeIn .18s ease; }
+.sheet:not(.hidden) .sheet-content { animation: sheetUp .22s cubic-bezier(.2,.8,.2,1); }
 .sheet-backdrop { position: absolute; inset: 0; background: rgba(0,0,0,.55); }
 .sheet-content {
   position: relative;
@@ -373,6 +486,8 @@ html, body {
 
 /* ===== Confirm dialog ===== */
 .confirm-dialog { position: fixed; inset: 0; z-index: 80; display: flex; align-items: center; justify-content: center; background: rgba(0,0,0,.6); padding: 20px; }
+.confirm-dialog:not(.hidden) { animation: fadeIn .15s ease; }
+.confirm-dialog:not(.hidden) .confirm-box { animation: scaleIn .18s cubic-bezier(.2,.8,.2,1); }
 .confirm-box { background: var(--bg-elevated); border-radius: 16px; padding: 20px; max-width: 320px; width: 100%; text-align: center; }
 .confirm-box p { margin: 0 0 16px; }
 .confirm-actions { display: flex; gap: 10px; }
@@ -386,6 +501,8 @@ html, body {
   padding: 24px;
   cursor: zoom-out;
 }
+.image-lightbox:not(.hidden) { animation: fadeIn .15s ease; }
+.image-lightbox:not(.hidden) img { animation: scaleIn .18s cubic-bezier(.2,.8,.2,1); }
 .image-lightbox img { max-width: 100%; max-height: 100%; object-fit: contain; border-radius: 6px; }
 
 /* ===== Toast ===== */

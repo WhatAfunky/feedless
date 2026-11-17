@@ -8,12 +8,14 @@
   const MIN_PHOTO_SCALE = 1;
   const MAX_PHOTO_SCALE = 3;
   const DEFAULT_PHOTO_SCALE = 1.15;
+  const ENGAGEMENT_CAP = 9999; // hard ceiling — never shows 10k or more
 
   const ICONS = {
     reply: '<svg viewBox="0 0 24 24" width="18" height="18"><path fill="none" stroke="currentColor" stroke-width="2" stroke-linejoin="round" d="M3 4.5h18v12H8.5L4 20.5V16.5H3z"/></svg>',
     retweet: '<svg viewBox="0 0 24 24" width="18" height="18"><path fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" d="M4.5 7h11l-2.5-2.5M4.5 7L7 9.5M19.5 17h-11l2.5 2.5M19.5 17L17 14.5"/></svg>',
     like: '<svg viewBox="0 0 24 24" width="18" height="18"><path fill="none" stroke="currentColor" stroke-width="2" d="M12 20.3S3.5 15.4 3.5 9.3A4.8 4.8 0 0112 6.2a4.8 4.8 0 018.5 3.1c0 6.1-8.5 11-8.5 11z"/></svg>',
     share: '<svg viewBox="0 0 24 24" width="18" height="18"><path fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" d="M12 3.5v11M8 7.5l4-4 4 4M5 20.5h14"/></svg>',
+    bookmark: '<svg viewBox="0 0 24 24" width="22" height="22"><path fill="none" stroke="currentColor" stroke-width="2" stroke-linejoin="round" d="M6 3.5h12v17l-6-4-6 4v-17z"/></svg>',
   };
 
   const $ = (id) => document.getElementById(id);
@@ -74,7 +76,9 @@
   let settings = { fakeEngagement: true };
   let stories = [];
   let tweets = [];
-  let activeTab = "stories";
+  let feedPosts = [];
+  let activeTab = "instagram";
+  let igSub = "stories";
 
   // story composer transient state
   let composerBg = { type: "color", color: BG_SWATCHES[0] };
@@ -87,6 +91,7 @@
   let viewerIndex = 0;
 
   let pendingTweetImage = null;
+  let feedComposerImage = null;
 
   function defaultAvatar(seedText) {
     const letter = (seedText || "Y").trim().charAt(0).toUpperCase() || "Y";
@@ -104,8 +109,10 @@
     settings = await DB.kvGet("settings", null) || { fakeEngagement: true };
     stories = await DB.getAll("stories");
     tweets = await DB.getAll("tweets");
+    feedPosts = await DB.getAll("feedPosts");
     stories.sort((a, b) => a.createdAt - b.createdAt);
     tweets.sort((a, b) => b.createdAt - a.createdAt);
+    feedPosts.sort((a, b) => b.createdAt - a.createdAt);
   }
 
   function saveProfile() { return DB.kvSet("profile", profile); }
@@ -119,6 +126,27 @@
     el.classList.remove("hidden");
     clearTimeout(toastTimer);
     toastTimer = setTimeout(() => el.classList.add("hidden"), 1800);
+  }
+
+  // ===== Posting progress bar (fast, not instant) =====
+  function showPostProgress() {
+    return new Promise((resolve) => {
+      const bar = $("postProgressBar");
+      bar.style.transition = "none";
+      bar.style.width = "0%";
+      bar.style.opacity = "1";
+      // force reflow so the width transition below actually animates from 0
+      void bar.offsetWidth;
+      requestAnimationFrame(() => {
+        bar.style.transition = "width .4s cubic-bezier(.2,.8,.2,1)";
+        bar.style.width = "100%";
+      });
+      setTimeout(() => {
+        bar.style.transition = "opacity .22s ease";
+        bar.style.opacity = "0";
+        resolve();
+      }, 420);
+    });
   }
 
   // ===== Confirm dialog =====
@@ -143,6 +171,7 @@
   function renderProfile() {
     $("profileAvatar").src = profile.avatar;
     $("composerAvatar").src = profile.avatar;
+    $("feedComposeAvatar").src = profile.avatar;
     $("settingsAvatarPreview").src = profile.avatar;
     $("nameInput").value = profile.name;
     $("handleInput").value = profile.handle;
@@ -150,13 +179,35 @@
   }
 
   // ===== Tabs =====
+  function playViewAnim(el) {
+    if (!el) return;
+    el.classList.remove("anim-in");
+    void el.offsetWidth; // restart the animation each time
+    el.classList.add("anim-in");
+  }
+
+  function updateTopbarTitle() {
+    if (activeTab === "instagram") $("topbarTitle").textContent = igSub === "stories" ? "Stories" : "Feed";
+    else $("topbarTitle").textContent = "Posts";
+  }
+
   function setTab(tab) {
     activeTab = tab;
     document.querySelectorAll(".tab-btn").forEach((b) => b.classList.toggle("active", b.dataset.tab === tab));
-    $("storiesView").classList.toggle("hidden", tab !== "stories");
-    $("tweetsView").classList.toggle("hidden", tab !== "tweets");
-    $("topbarTitle").textContent = tab === "stories" ? "Stories" : "Posts";
-    document.body.classList.toggle("mode-tweets", tab === "tweets");
+    $("igView").classList.toggle("hidden", tab !== "instagram");
+    $("tweetsView").classList.toggle("hidden", tab !== "twitter");
+    document.body.classList.toggle("mode-tweets", tab === "twitter");
+    updateTopbarTitle();
+    playViewAnim(tab === "instagram" ? $("igView") : $("tweetsView"));
+  }
+
+  function setIgSub(sub) {
+    igSub = sub;
+    document.querySelectorAll(".ig-sub-btn").forEach((b) => b.classList.toggle("active", b.dataset.sub === sub));
+    $("igStoriesPane").classList.toggle("hidden", sub !== "stories");
+    $("igFeedPane").classList.toggle("hidden", sub !== "feed");
+    updateTopbarTitle();
+    playViewAnim(sub === "stories" ? $("igStoriesPane") : $("igFeedPane"));
   }
 
   // ===== Stories: ring =====
@@ -601,11 +652,20 @@
     row.classList.remove("hidden");
   }
 
+  async function handleStoryPhotoFile(file) {
+    if (!file) return;
+    const dataUrl = await resizeImageFile(file, 1280, 0.85);
+    composerBg = { type: "photo", dataUrl, scale: DEFAULT_PHOTO_SCALE, tx: 0, ty: 0 };
+    applyBackgroundToCanvas();
+  }
+
   async function shareStory() {
     if (composerBg.type === "color" && composerTexts.length === 0) {
       const ok = await confirmDialog("Post a plain color story with no text?");
       if (!ok) return;
     }
+    $("storyShareBtn").disabled = true;
+    await showPostProgress();
     const bg = composerBg.type === "photo"
       ? { type: "photo", dataUrl: composerBg.dataUrl, scale: composerBg.scale, tx: composerBg.tx, ty: composerBg.ty }
       : { type: "color", color: composerBg.color };
@@ -621,20 +681,42 @@
     renderRing();
     renderArchiveGrid();
     closeStoryComposer();
+    $("storyShareBtn").disabled = false;
+    const newBubble = $("ringRow").children[1];
+    if (newBubble) newBubble.classList.add("pop-in");
     toast("Posted to your story");
   }
 
-  // ===== Tweets =====
+  // ===== Fake engagement — starts near zero, creeps up slowly, always under 10k =====
+  function engagementPotential(id) {
+    const seed = hashStr(id);
+    const base = 8 + (seed % 180);                                    // most posts: modest
+    const viral = (seed % 37 === 0) ? (300 + (seed % 9600)) : 0;        // rare: a "viral" one
+    return Math.min(ENGAGEMENT_CAP, base + viral);
+  }
+
+  function engagementGrowth(createdAt) {
+    const elapsedHours = Math.max(0, (Date.now() - createdAt) / 3600000);
+    return 1 - Math.exp(-elapsedHours / 2.5); // 0 at post-time, ~63% by 2.5h, ~95% by ~7.5h
+  }
+
   function engagementFor(tweet) {
     if (!settings.fakeEngagement) return { likes: tweet.baseLikes || 0, retweets: tweet.baseRetweets || 0 };
-    const elapsedMin = Math.max(0, (Date.now() - tweet.createdAt) / 60000);
     const seed = hashStr(tweet.id);
-    const growth = Math.log2(elapsedMin + 2) * (2.2 + (seed % 7));
-    const likes = Math.min(9999, Math.round(growth * (1 + (seed % 5) * 0.25)));
-    const retweets = Math.min(9999, Math.round(likes * 0.18 + (seed % 3)));
+    const likes = Math.min(ENGAGEMENT_CAP, Math.round(engagementPotential(tweet.id) * engagementGrowth(tweet.createdAt)));
+    const retweets = Math.min(ENGAGEMENT_CAP, Math.round(likes * (0.12 + (seed % 5) * 0.03)));
     return { likes, retweets };
   }
 
+  function engagementForPost(post) {
+    if (!settings.fakeEngagement) return { likes: post.baseLikes || 0, comments: post.baseComments || 0 };
+    const seed = hashStr(post.id);
+    const likes = Math.min(ENGAGEMENT_CAP, Math.round(engagementPotential(post.id) * engagementGrowth(post.createdAt)));
+    const comments = Math.min(ENGAGEMENT_CAP, Math.round(likes * (0.03 + (seed % 4) * 0.02)));
+    return { likes, comments };
+  }
+
+  // ===== Tweets =====
   function renderTweetCount() {
     const len = $("tweetText").value.length;
     $("tweetCount").textContent = String(280 - len);
@@ -686,9 +768,28 @@
     return (s || "").replace(/[&<>"']/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[c]));
   }
 
+  function formatFeedTime(ts) {
+    const t = fmtTime(ts);
+    return t === "now" ? "JUST NOW" : t.toUpperCase() + " AGO";
+  }
+
+  function renderCaptionHtml(name, caption) {
+    const escaped = escapeHtml(caption || "");
+    const linked = escaped.replace(/(^|[\s(])(#[A-Za-z0-9_]+)/g, '$1<span class="hashtag">$2</span>');
+    return `<span class="fc-username">${escapeHtml(name)}</span>${linked}`;
+  }
+
+  async function handleTweetImageFile(file) {
+    if (!file) return;
+    pendingTweetImage = await resizeImageFile(file, 1080, 0.82);
+    renderTweetImagePreview();
+  }
+
   async function postTweet() {
     const text = $("tweetText").value.trim();
     if (!text) return;
+    $("tweetPostBtn").disabled = true;
+    await showPostProgress();
     const tweet = {
       id: uid(),
       createdAt: Date.now(),
@@ -705,6 +806,8 @@
     renderTweetImagePreview();
     renderTweetCount();
     renderTimeline();
+    const first = $("tweetTimeline").firstElementChild;
+    if (first) first.classList.add("pop-in");
     toast("Posted");
   }
 
@@ -714,6 +817,87 @@
     await DB.remove("tweets", id);
     tweets = tweets.filter((t) => t.id !== id);
     renderTimeline();
+  }
+
+  // ===== Instagram feed posts =====
+  function renderFeedList() {
+    const container = $("feedList");
+    container.innerHTML = "";
+    $("feedEmpty").classList.toggle("hidden", feedPosts.length > 0);
+    for (const p of feedPosts) {
+      const eng = engagementForPost(p);
+      const card = document.createElement("div");
+      card.className = "feed-card";
+      card.innerHTML = `
+        <div class="feed-card-head">
+          <img class="feed-card-avatar" src="${profile.avatar}" alt="" />
+          <span class="feed-card-name">${escapeHtml(profile.handle)}</span>
+          <button class="feed-card-menu" data-id="${p.id}">⋯</button>
+        </div>
+        <div class="feed-image-wrap"><img src="${p.image}" alt="" data-full="${p.image}" /></div>
+        <div class="feed-actions-row">
+          <span>${ICONS.like}</span>
+          <span>${ICONS.reply}</span>
+          <span>${ICONS.share}</span>
+          <span class="spacer"></span>
+          <span>${ICONS.bookmark}</span>
+        </div>
+        <div class="feed-likes">${eng.likes.toLocaleString()} likes</div>
+        ${p.caption ? `<div class="feed-caption">${renderCaptionHtml(profile.handle, p.caption)}</div>` : ""}
+        ${eng.comments > 0 ? `<div class="feed-comments-link">View all ${eng.comments.toLocaleString()} comments</div>` : ""}
+        <div class="feed-time">${formatFeedTime(p.createdAt)}</div>
+      `;
+      container.appendChild(card);
+    }
+  }
+
+  function resetFeedComposer() {
+    feedComposerImage = null;
+    $("feedComposePreview").innerHTML = '<span class="feed-compose-hint">Pick or take a photo</span>';
+    $("feedCaptionInput").value = "";
+    $("feedShareBtn").disabled = true;
+  }
+
+  function openFeedComposer() {
+    resetFeedComposer();
+    $("feedComposer").classList.remove("hidden");
+  }
+  function closeFeedComposer() { $("feedComposer").classList.add("hidden"); }
+
+  async function handleFeedPhotoFile(file) {
+    if (!file) return;
+    feedComposerImage = await resizeImageFile(file, 1280, 0.85);
+    $("feedComposePreview").innerHTML = `<img src="${feedComposerImage}" alt="" />`;
+    $("feedShareBtn").disabled = false;
+  }
+
+  async function shareFeedPost() {
+    if (!feedComposerImage) return;
+    $("feedShareBtn").disabled = true;
+    await showPostProgress();
+    const post = {
+      id: uid(),
+      createdAt: Date.now(),
+      image: feedComposerImage,
+      caption: $("feedCaptionInput").value.trim(),
+      baseLikes: 0,
+      baseComments: 0,
+    };
+    await DB.put("feedPosts", post);
+    feedPosts.unshift(post);
+    closeFeedComposer();
+    renderFeedList();
+    const first = $("feedList").firstElementChild;
+    if (first) first.classList.add("pop-in");
+    toast("Shared");
+  }
+
+  async function deleteFeedPost(id) {
+    const ok = await confirmDialog("Delete this post?");
+    if (!ok) return;
+    await DB.remove("feedPosts", id);
+    feedPosts = feedPosts.filter((p) => p.id !== id);
+    renderFeedList();
   }
 
   // ===== Image lightbox =====
@@ -744,7 +928,7 @@
   }
 
   async function exportBackup() {
-    const data = { profile, settings, stories, tweets, exportedAt: Date.now(), version: 1 };
+    const data = { profile, settings, stories, tweets, feedPosts, exportedAt: Date.now(), version: 2 };
     const blob = new Blob([JSON.stringify(data)], { type: "application/json" });
     const url = URL.createObjectURL(blob);
     const a = document.createElement("a");
@@ -768,6 +952,7 @@
       if (data.settings) { settings = data.settings; await saveSettings(); }
       for (const s of data.stories || []) await DB.put("stories", s);
       for (const t of data.tweets || []) await DB.put("tweets", t);
+      for (const p of data.feedPosts || []) await DB.put("feedPosts", p);
       await loadState();
       renderAll();
       toast("Backup imported");
@@ -785,6 +970,7 @@
     settings = { fakeEngagement: true };
     stories = [];
     tweets = [];
+    feedPosts = [];
     renderAll();
     toast("Everything deleted");
   }
@@ -795,10 +981,12 @@
     renderRing();
     renderArchiveGrid();
     renderTimeline();
+    renderFeedList();
   }
 
   function init() {
     document.querySelectorAll(".tab-btn").forEach((b) => b.addEventListener("click", () => setTab(b.dataset.tab)));
+    document.querySelectorAll(".ig-sub-btn").forEach((b) => b.addEventListener("click", () => setIgSub(b.dataset.sub)));
 
     $("profileBtn").addEventListener("click", openSettings);
     $("settingsBtn").addEventListener("click", openSettings);
@@ -807,7 +995,7 @@
 
     $("nameInput").addEventListener("input", async (e) => { profile.name = e.target.value || "You"; await saveProfile(); renderAll(); });
     $("handleInput").addEventListener("input", async (e) => { profile.handle = (e.target.value || "you").replace(/\s+/g, ""); await saveProfile(); renderAll(); });
-    $("fakeEngagementToggle").addEventListener("change", async (e) => { settings.fakeEngagement = e.target.checked; await saveSettings(); renderTimeline(); });
+    $("fakeEngagementToggle").addEventListener("change", async (e) => { settings.fakeEngagement = e.target.checked; await saveSettings(); renderTimeline(); renderFeedList(); });
 
     $("changeAvatarBtn").addEventListener("click", () => $("avatarInput").click());
     $("avatarInput").addEventListener("change", async (e) => {
@@ -851,14 +1039,9 @@
       closeStoryComposer();
     });
     $("storyPickPhoto").addEventListener("click", () => $("storyPhotoInput").click());
-    $("storyPhotoInput").addEventListener("change", async (e) => {
-      const file = e.target.files[0];
-      if (!file) return;
-      const dataUrl = await resizeImageFile(file, 1280, 0.85);
-      composerBg = { type: "photo", dataUrl, scale: DEFAULT_PHOTO_SCALE, tx: 0, ty: 0 };
-      applyBackgroundToCanvas();
-      e.target.value = "";
-    });
+    $("storyPhotoInput").addEventListener("change", (e) => { handleStoryPhotoFile(e.target.files[0]); e.target.value = ""; });
+    $("storyTakePhoto").addEventListener("click", () => $("storyCameraInput").click());
+    $("storyCameraInput").addEventListener("change", (e) => { handleStoryPhotoFile(e.target.files[0]); e.target.value = ""; });
     $("storyColorBtn").addEventListener("click", () => {
       deselectAll();
       swatchMode = "bg";
@@ -878,13 +1061,9 @@
     // Tweets
     $("tweetText").addEventListener("input", renderTweetCount);
     $("tweetImageBtn").addEventListener("click", () => $("tweetImageInput").click());
-    $("tweetImageInput").addEventListener("change", async (e) => {
-      const file = e.target.files[0];
-      if (!file) return;
-      pendingTweetImage = await resizeImageFile(file, 1080, 0.82);
-      renderTweetImagePreview();
-      e.target.value = "";
-    });
+    $("tweetImageInput").addEventListener("change", (e) => { handleTweetImageFile(e.target.files[0]); e.target.value = ""; });
+    $("tweetCameraBtn").addEventListener("click", () => $("tweetCameraInput").click());
+    $("tweetCameraInput").addEventListener("change", (e) => { handleTweetImageFile(e.target.files[0]); e.target.value = ""; });
     $("removeTweetImage").addEventListener("click", () => { pendingTweetImage = null; renderTweetImagePreview(); });
     $("tweetPostBtn").addEventListener("click", postTweet);
     $("tweetTimeline").addEventListener("click", (e) => {
@@ -893,13 +1072,38 @@
       const img = e.target.closest(".tweet-image img");
       if (img) openLightbox(img.dataset.full || img.src);
     });
+
+    // Instagram feed
+    $("addFeedPostBtn").addEventListener("click", openFeedComposer);
+    $("feedComposerClose").addEventListener("click", async () => {
+      if (feedComposerImage) {
+        const ok = await confirmDialog("Discard this post?");
+        if (!ok) return;
+      }
+      closeFeedComposer();
+    });
+    $("feedPickPhotoBtn").addEventListener("click", () => $("feedPhotoInput").click());
+    $("feedPhotoInput").addEventListener("change", (e) => { handleFeedPhotoFile(e.target.files[0]); e.target.value = ""; });
+    $("feedTakePhotoBtn").addEventListener("click", () => $("feedCameraInput").click());
+    $("feedCameraInput").addEventListener("change", (e) => { handleFeedPhotoFile(e.target.files[0]); e.target.value = ""; });
+    $("feedShareBtn").addEventListener("click", shareFeedPost);
+    $("feedList").addEventListener("click", (e) => {
+      const btn = e.target.closest(".feed-card-menu");
+      if (btn) { deleteFeedPost(btn.dataset.id); return; }
+      const img = e.target.closest(".feed-image-wrap img");
+      if (img) openLightbox(img.dataset.full || img.src);
+    });
+
     $("imageLightbox").addEventListener("click", closeLightbox);
 
     window.addEventListener("online", updateOfflineStatus);
     window.addEventListener("offline", updateOfflineStatus);
 
     // Refresh engagement numbers periodically while app is open
-    setInterval(() => { if (activeTab === "tweets") renderTimeline(); }, 30000);
+    setInterval(() => {
+      if (activeTab === "twitter") renderTimeline();
+      else if (activeTab === "instagram" && igSub === "feed") renderFeedList();
+    }, 30000);
   }
 
   async function start() {
@@ -907,7 +1111,8 @@
     await loadState();
     renderAll();
     renderTweetCount();
-    setTab("stories");
+    setTab("instagram");
+    setIgSub("stories");
 
     if ("serviceWorker" in navigator) {
       navigator.serviceWorker.register("sw.js").catch(() => {});

@@ -17,6 +17,8 @@
 
 <div id="app">
 
+  <div id="postProgressBar" class="post-progress-bar"></div>
+
   <!-- ===== Top bar ===== -->
   <header class="topbar">
     <button id="profileBtn" class="avatar-btn" aria-label="Profile">
@@ -26,25 +28,47 @@
     <button id="settingsBtn" class="icon-btn" aria-label="Settings">⚙</button>
   </header>
 
-  <!-- ===== STORIES VIEW ===== -->
-  <section id="storiesView" class="view">
-    <div class="ring-row" id="ringRow">
-      <button class="ring-item add-ring" id="addStoryBtn">
-        <span class="ring-thumb add-thumb">+</span>
-        <span class="ring-label">Add</span>
+  <!-- ===== INSTAGRAM VIEW (Stories + Feed) ===== -->
+  <section id="igView" class="view">
+    <div class="ig-subnav">
+      <button class="ig-sub-btn active" data-sub="stories">Stories</button>
+      <button class="ig-sub-btn" data-sub="feed">Feed</button>
+    </div>
+
+    <div id="igStoriesPane" class="ig-pane">
+      <div class="ring-row" id="ringRow">
+        <button class="ring-item add-ring" id="addStoryBtn">
+          <span class="ring-thumb add-thumb">+</span>
+          <span class="ring-label">Add</span>
+        </button>
+        <!-- story ring items injected here -->
+      </div>
+
+      <div class="archive-toggle-row">
+        <button id="archiveToggleBtn" class="link-btn">View archive ▾</button>
+      </div>
+
+      <div id="storyArchiveGrid" class="archive-grid hidden"></div>
+
+      <div id="storiesEmpty" class="empty-state hidden">
+        <p>No stories yet.</p>
+        <p class="muted">Tap “Add” to post your first one.</p>
+      </div>
+    </div>
+
+    <div id="igFeedPane" class="ig-pane hidden">
+      <button id="addFeedPostBtn" class="feed-compose-row">
+        <img id="feedComposeAvatar" class="feed-compose-avatar" src="" alt="" />
+        <span class="feed-compose-placeholder">Share a photo...</span>
+        <span class="feed-compose-plus">+</span>
       </button>
-      <!-- story ring items injected here -->
-    </div>
 
-    <div class="archive-toggle-row">
-      <button id="archiveToggleBtn" class="link-btn">View archive ▾</button>
-    </div>
+      <div id="feedList" class="feed-list"></div>
 
-    <div id="storyArchiveGrid" class="archive-grid hidden"></div>
-
-    <div id="storiesEmpty" class="empty-state hidden">
-      <p>No stories yet.</p>
-      <p class="muted">Tap “Add” to post your first one.</p>
+      <div id="feedEmpty" class="empty-state hidden">
+        <p>No posts yet.</p>
+        <p class="muted">Share your first photo above.</p>
+      </div>
     </div>
   </section>
 
@@ -61,6 +85,8 @@
         <div class="composer-row">
           <button id="tweetImageBtn" class="icon-btn small" aria-label="Add photo">🖼</button>
           <input id="tweetImageInput" type="file" accept="image/*" class="hidden-input" />
+          <button id="tweetCameraBtn" class="icon-btn small" aria-label="Take photo">📷</button>
+          <input id="tweetCameraInput" type="file" accept="image/*" capture="environment" class="hidden-input" />
           <span id="tweetCount" class="char-count">280</span>
           <button id="tweetPostBtn" class="post-btn" disabled>Post</button>
         </div>
@@ -77,11 +103,11 @@
 
   <!-- ===== Bottom tab bar ===== -->
   <nav class="tabbar">
-    <button class="tab-btn active" data-tab="stories">
-      <span class="tab-icon">◎</span><span>Stories</span>
+    <button class="tab-btn active" data-tab="instagram">
+      <span class="tab-icon">◎</span><span>Instagram</span>
     </button>
-    <button class="tab-btn" data-tab="tweets">
-      <span class="tab-icon">✎</span><span>Posts</span>
+    <button class="tab-btn" data-tab="twitter">
+      <span class="tab-icon">✎</span><span>Twitter</span>
     </button>
   </nav>
 
@@ -113,6 +139,8 @@
         <button id="storyZoomIn" class="chip-btn icon-only hidden" aria-label="Zoom in">+</button>
         <button id="storyPickPhoto" class="chip-btn">Photo</button>
         <input id="storyPhotoInput" type="file" accept="image/*" class="hidden-input" />
+        <button id="storyTakePhoto" class="chip-btn">Camera</button>
+        <input id="storyCameraInput" type="file" accept="image/*" capture="environment" class="hidden-input" />
         <button id="storyColorBtn" class="chip-btn">Background</button>
         <button id="storyAddTextBtn" class="chip-btn">Aa Text</button>
       </div>
@@ -123,6 +151,30 @@
     <div id="colorSwatchRow" class="color-swatch-row hidden"></div>
     <div class="story-bottom-row">
       <button id="storyShareBtn" class="post-btn wide">Share to story</button>
+    </div>
+  </div>
+
+  <!-- ===== Feed post composer (fullscreen) ===== -->
+  <div id="feedComposer" class="story-composer hidden">
+    <div class="composer-topbar">
+      <button id="feedComposerClose" class="icon-btn">✕</button>
+      <div class="composer-topbar-actions">
+        <button id="feedPickPhotoBtn" class="chip-btn">Photo</button>
+        <input id="feedPhotoInput" type="file" accept="image/*" class="hidden-input" />
+        <button id="feedTakePhotoBtn" class="chip-btn">Camera</button>
+        <input id="feedCameraInput" type="file" accept="image/*" capture="environment" class="hidden-input" />
+      </div>
+    </div>
+    <div class="feed-compose-preview-wrap">
+      <div id="feedComposePreview" class="feed-compose-preview">
+        <span class="feed-compose-hint">Pick or take a photo</span>
+      </div>
+    </div>
+    <div class="feed-caption-row">
+      <textarea id="feedCaptionInput" maxlength="2200" placeholder="Write a caption... #hashtags welcome"></textarea>
+    </div>
+    <div class="story-bottom-row">
+      <button id="feedShareBtn" class="post-btn wide" disabled>Share post</button>
     </div>
   </div>
 
